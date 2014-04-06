@@ -12,6 +12,8 @@ package music_stream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javazoom.jl.decoder.JavaLayerException;
 import org.alljoyn.bus.BusAttachment;
 import org.alljoyn.bus.BusException;
@@ -24,6 +26,7 @@ import org.alljoyn.bus.SessionPortListener;
 import org.alljoyn.bus.SignalEmitter;
 import org.alljoyn.bus.Status;
 import javazoom.jl.player.Player;
+import org.alljoyn.bus.annotation.BusSignalHandler;
 
 public class Service {
 
@@ -38,7 +41,8 @@ public class Service {
     static boolean mSessionEstablished = false;
     static int mSessionId;
     static String mJoinerName;
-
+    private static FileInputStream in;
+    
     // data is sent through the interface
     public static class SignalInterface implements SampleInterface, BusObject {
 
@@ -47,8 +51,25 @@ public class Service {
             // No implementation required for sending data
         }
 
+        @Override
+        public void ready(String s) throws BusException {
+            // No implementation required for sending data
+        }
+
     }
 
+    public static class SampleSignalHandler {
+
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "ready")
+        public void ready(String s){
+            if(s.equals("start"))
+            {
+                System.out.println("start called");
+                new musicPlayerThread(in).start();
+            }
+        }
+    }
+    
     private static class MyBusListener extends BusListener {
 
         public void nameOwnerChanged(String busName, String previousOwner, String newOwner) {
@@ -119,7 +140,16 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.request 'com.my.well.known.name' successful");
+        
+        SampleSignalHandler mySignalHandlers = new SampleSignalHandler();
 
+        status = mBus.registerSignalHandlers(mySignalHandlers);
+        if (status != Status.OK) {
+            System.out.println(status);
+            return;
+        }
+        System.out.println("BusAttachment.registerSignalHandlers successful");
+        
         status = mBus.advertiseName("com.my.well.known.name", SessionOpts.TRANSPORT_ANY);
         if (status != Status.OK) {
             System.out.println("Status = " + status);
@@ -127,7 +157,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.advertiseName 'com.my.well.known.name' successful");
-        FileInputStream in = new FileInputStream("C:\\Users\\admin\\Music\\SexyBack.mp3");
+        
         try {
             while (!mSessionEstablished) {
                 Thread.sleep(10);
@@ -138,16 +168,19 @@ public class Service {
             SignalEmitter emitter = new SignalEmitter(mySignalInterface, mSessionId, SignalEmitter.GlobalBroadcast.On);
 
             myInterface = emitter.getInterface(SampleInterface.class);
-
+            
+            in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
+            //for data sending purpose
+            FileInputStream in2=new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             while (true) {
-                int len = in.available();
+                int len = in2.available();
                 if (len > 50000) {
                     len = 50000;
                 }
                 byte[] data = new byte[len];
-                in.read(data, 0, len);
+                in2.read(data, 0, len);
                 myInterface.music_data(data);
-                Thread.sleep(1000);
+                Thread.sleep(50);
             }
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
@@ -155,4 +188,22 @@ public class Service {
             System.out.println("Bus Exception: " + ex.toString());
         }
     }
+}
+
+class musicPlayerThread extends Thread {
+FileInputStream data;
+  public musicPlayerThread(FileInputStream in) {
+    this.data=in;
+  }
+
+  public void run() {
+  Player mp3player;
+    try {
+        mp3player = new Player(data);
+        mp3player.play();
+    } catch (JavaLayerException ex) {
+        Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
+    }
+  
+  }
 }

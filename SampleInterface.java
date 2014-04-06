@@ -22,6 +22,7 @@ public interface SampleInterface {
     @BusSignal
     public void music_data(byte[] data) throws BusException;
     
-    
+    @BusSignal
+    public void ready(String s) throws BusException;
 }
 
