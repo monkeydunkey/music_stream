@@ -10,6 +10,12 @@ package music_stream;
  * @author Shashank
  */
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javazoom.jl.decoder.JavaLayerException;
 import javazoom.jl.player.Player;
 import org.alljoyn.bus.BusAttachment;
@@ -33,11 +39,17 @@ public class Client {
     private static byte[] mu_data = new byte[10000000];
     private static int offset = 0;
     private static Boolean connected = false;
-    private static Boolean connection_ready=false;
-    private static SignalInterface mySignalInterface=null;
+    private static Boolean connection_ready = false;
+    private static SignalInterface mySignalInterface = null;
     private static SampleInterface myInterface;
-    
-    
+    private static Boolean Start_playing = false;
+    private static int time_sync_count = 0;
+    private static int time_left = 0;
+    private static long previous_time;
+    private static ByteArrayInputStream in;
+    private static Boolean time_sync_completed = false;
+    private static Date date = new Date();
+
     public static class SampleSignalHandler {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "music_data")
@@ -48,13 +60,32 @@ public class Client {
             }
             offset += data.length;
         }
-        
-        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "ready")
-        public void ready(String s) throws BusException{
-            if(s=="are you ready"){
-                myInterface.ready("ready");
+
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
+        public void clock_sync(int count_down) {
+
+            if (time_sync_count == 0) {
+                previous_time = date.getTime();
+                time_left = count_down;
+                time_sync_count++;
+            } else {
+                if (date.getTime()-previous_time < 100) {
+                    time_left = count_down;
+                }
+                previous_time=date.getTime();
+                System.out.println("time_left " + count_down);
+
+                time_sync_count++;
+
+                if (time_sync_count == 5) {
+                    time_sync_completed = true;
+                    TimerTask music_player = new musicPlayer(in);
+                    Timer t1 = new Timer(true);
+                    System.out.println("time left " + time_left);
+                    t1.schedule(music_player, time_left);
+
+                }
             }
-            connection_ready=true;
         }
     }
 
@@ -66,13 +97,13 @@ public class Client {
         }
 
         @Override
-        public void ready(String s) throws BusException {
-            // No implementation required for sending data
+        public void clock_sync(int count_down) throws BusException {
+
         }
 
     }
 
-    public static void main(String[] args) throws JavaLayerException, BusException {
+    public static void main(String[] args) throws JavaLayerException, BusException, InterruptedException {
 
         class MyBusListener extends BusListener {
 
@@ -94,8 +125,8 @@ public class Client {
                     return;
                 }
                 System.out.println(String.format("BusAttachement.joinSession successful sessionId = %d", sessionId.value));
-                SignalEmitter mySignalEmitter=new SignalEmitter(mySignalInterface,sessionId.value,SignalEmitter.GlobalBroadcast.On);
-                myInterface=mySignalEmitter.getInterface(SampleInterface.class);
+                SignalEmitter mySignalEmitter = new SignalEmitter(mySignalInterface, sessionId.value, SignalEmitter.GlobalBroadcast.On);
+                myInterface = mySignalEmitter.getInterface(SampleInterface.class);
                 connected = true;
                 System.out.println("we are here");
             }
@@ -127,16 +158,16 @@ public class Client {
             return;
         }
         System.out.println("BusAttachment.registerSignalHandlers successful");
-        
-        mySignalInterface=new SignalInterface();
-        status=mBus.registerBusObject(mySignalInterface, "/MyService/Path");
-        if(status!=status.OK){
+
+        mySignalInterface = new SignalInterface();
+        status = mBus.registerBusObject(mySignalInterface, "/MyService/Path");
+        if (status != status.OK) {
             System.out.println("SignalInterface not registered");
             return;
         }
-        
+
         System.out.println("BusAttachment.registerSignalInterface successful");
-        
+
         status = mBus.findAdvertisedName("com.my.well.known.name");
         if (status != Status.OK) {
             return;
@@ -150,17 +181,40 @@ public class Client {
                 System.out.println("Exception caught at sleep in client");
             }
         }
-        myInterface.ready("start");
+
         System.out.println("start playing");
-        ByteArrayInputStream in = new ByteArrayInputStream(mu_data);
-        Player mp3player = new Player(in);
-        mp3player.play();
-        /*while(true) {
+        in = new ByteArrayInputStream(mu_data);
+        /*Player mp3player = new Player(in);
+         mp3player.play();
+         /*while(true) {
          try {
          Thread.sleep(5000);
          } catch (InterruptedException e) {
          System.out.println("Program interupted");
          }
          }*/
+        while (true) {
+            Thread.sleep(1000);
+        }
+    }
+}
+
+class musicPlayer extends TimerTask {
+
+    ByteArrayInputStream data;
+
+    public musicPlayer(ByteArrayInputStream in) {
+        this.data = in;
+    }
+
+    public void run() {
+        Player mp3player;
+        try {
+            mp3player = new Player(data);
+            mp3player.play();
+        } catch (JavaLayerException ex) {
+            Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
     }
 }

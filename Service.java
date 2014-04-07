@@ -12,6 +12,8 @@ package music_stream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javazoom.jl.decoder.JavaLayerException;
@@ -52,7 +54,7 @@ public class Service {
         }
 
         @Override
-        public void ready(String s) throws BusException {
+        public void clock_sync(int countdown) throws BusException {
             // No implementation required for sending data
         }
 
@@ -60,13 +62,9 @@ public class Service {
 
     public static class SampleSignalHandler {
 
-        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "ready")
-        public void ready(String s){
-            if(s.equals("start"))
-            {
-                System.out.println("start called");
-                new musicPlayerThread(in).start();
-            }
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
+        public void clock_sync(int countdown){
+            
         }
     }
     
@@ -79,7 +77,7 @@ public class Service {
         }
     }
 
-    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException {
+    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException {
 
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
@@ -172,6 +170,10 @@ public class Service {
             in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
             FileInputStream in2=new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
+            TimerTask music_player=new musicPlayerThread(in);
+            Timer t1=new Timer(true);
+            t1.schedule(music_player, 600);
+            new time_sync_Thread(myInterface).start();
             while (true) {
                 int len = in2.available();
                 if (len > 50000) {
@@ -180,17 +182,20 @@ public class Service {
                 byte[] data = new byte[len];
                 in2.read(data, 0, len);
                 myInterface.music_data(data);
-                Thread.sleep(50);
+                Thread.sleep(60);
             }
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
         } catch (BusException ex) {
             System.out.println("Bus Exception: " + ex.toString());
         }
+        while(true){
+            Thread.sleep(1000);
+        }
     }
 }
 
-class musicPlayerThread extends Thread {
+class musicPlayerThread extends TimerTask {
 FileInputStream data;
   public musicPlayerThread(FileInputStream in) {
     this.data=in;
@@ -205,5 +210,30 @@ FileInputStream data;
         Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
     }
   
+  }
+}
+
+class time_sync_Thread extends Thread {
+SampleInterface myInterface;
+  public time_sync_Thread(SampleInterface i) {
+    myInterface=i;
+  }
+
+  public void run() {
+  int time=600;
+  for(int i=0;i<5;i++){
+    try {
+        myInterface.clock_sync(time);
+    } catch (BusException ex) {
+        Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
+    }
+    try {
+        Thread.sleep(100);
+    } catch (InterruptedException ex) {
+        Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
+    }
+    
+    time=time-100;
+  }
   }
 }
