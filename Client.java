@@ -44,7 +44,7 @@ public class Client {
     private static SampleInterface myInterface;
     private static Boolean Start_playing = false;
     private static int time_sync_count = 0;
-    private static int time_left = 0;
+    private static long time_left = 0;
     private static long previous_time;
     private static ByteArrayInputStream in;
     private static Boolean time_sync_completed = false;
@@ -62,19 +62,26 @@ public class Client {
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(int count_down) {
+        public void clock_sync(long count_down) {
 
             if (time_sync_count == 0) {
-                previous_time = date.getTime();
+                previous_time = System.currentTimeMillis();
+                System.out.println(previous_time);
                 time_left = count_down;
                 time_sync_count++;
             } else {
-                if (date.getTime()-previous_time < 100) {
+                if (System.currentTimeMillis() - previous_time < 100) {
+                    System.out.println(System.currentTimeMillis());
+                    System.out.println(previous_time);
+                    System.out.println("");
                     time_left = count_down;
+                } else {
+                    
+                    time_left -= (System.currentTimeMillis() - previous_time);
                 }
-                previous_time=date.getTime();
-                System.out.println("time_left " + count_down);
-
+                previous_time = System.currentTimeMillis();
+                
+                System.out.println(previous_time);
                 time_sync_count++;
 
                 if (time_sync_count == 5) {
@@ -97,7 +104,7 @@ public class Client {
         }
 
         @Override
-        public void clock_sync(int count_down) throws BusException {
+        public void clock_sync(long count_down) throws BusException {
 
         }
 

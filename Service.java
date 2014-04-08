@@ -12,6 +12,7 @@ package music_stream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
@@ -54,7 +55,7 @@ public class Service {
         }
 
         @Override
-        public void clock_sync(int countdown) throws BusException {
+        public void clock_sync(long countdown) throws BusException {
             // No implementation required for sending data
         }
 
@@ -167,6 +168,11 @@ public class Service {
 
             myInterface = emitter.getInterface(SampleInterface.class);
             
+            Scanner i= new Scanner(System.in);
+            System.out.println("Please press enter to play");
+            
+            i.nextLine();
+            
             in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
             FileInputStream in2=new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
@@ -220,7 +226,7 @@ SampleInterface myInterface;
   }
 
   public void run() {
-  int time=600;
+  long time=600;
   for(int i=0;i<5;i++){
     try {
         myInterface.clock_sync(time);
