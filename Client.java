@@ -71,9 +71,9 @@ public class Client {
                 time_sync_count++;
             } else {
                 if (System.currentTimeMillis() - previous_time < 100) {
-                    System.out.println(System.currentTimeMillis());
+                    /*System.out.println(System.currentTimeMillis());
                     System.out.println(previous_time);
-                    System.out.println("");
+                    System.out.println("");*/
                     time_left = count_down;
                 } else {
                     
@@ -81,7 +81,7 @@ public class Client {
                 }
                 previous_time = System.currentTimeMillis();
                 
-                System.out.println(previous_time);
+                //System.out.println(previous_time);
                 time_sync_count++;
 
                 if (time_sync_count == 5) {
