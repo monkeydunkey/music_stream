@@ -186,7 +186,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.advertiseName 'com.my.well.known.name' successful");
-
+        new client_thread().start();
         try {
             while (!mSessionEstablished) {
                 Thread.sleep(10);
@@ -206,9 +206,8 @@ public class Service {
             in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
             FileInputStream in2 = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
-            myInterface.delay_est();
-            previous_time = System.currentTimeMillis();
-
+            myInterface.clock_sync(500, 0);
+            
             //TimerTask music_player=new musicPlayerThread(in);
             //Timer t1=new Timer(true);
             //t1.schedule(music_player, 600);
@@ -277,12 +276,26 @@ long delay;
         Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
     }
     try {
-        Thread.sleep(delay);
+        Thread.sleep(6*delay/10);
     } catch (InterruptedException ex) {
         Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
     }
     
-    time=time-delay;
+    time=time-(6*delay/10);
   }
   }
+}
+
+class client_thread extends Thread{
+    public void run(){
+        try {
+            service_client.run();
+        } catch (JavaLayerException ex) {
+            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (BusException ex) {
+            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
 }

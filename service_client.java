@@ -30,13 +30,13 @@ import org.alljoyn.bus.SignalEmitter;
 import org.alljoyn.bus.Status;
 import org.alljoyn.bus.annotation.BusSignalHandler;
 
-public class Client {
+public class service_client {
 
     static {
         System.loadLibrary("alljoyn_java");
     }
     private static final short CONTACT_PORT = 42;
-    static BusAttachment mBus;
+    static BusAttachment mBus1;
     private static byte[] mu_data = new byte[10000000];
     private static int offset = 0;
     private static Boolean connected = false;
@@ -66,10 +66,9 @@ public class Client {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
         public void clock_sync(long count_down, long delay) throws BusException {
-            TimerTask music_player = new musicPlayer(in);
+            TimerTask music_player = new muPlayer(in);
             Timer t1 = new Timer(true);
             t1.schedule(music_player, count_down);
-
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
@@ -98,8 +97,7 @@ public class Client {
 
     }
 
-    public static void main(String[] args) throws JavaLayerException, BusException, InterruptedException {
-
+    public static void run() throws JavaLayerException, BusException, InterruptedException {
         class MyBusListener extends BusListener {
 
             public void foundAdvertisedName(String name, short transport, String namePrefix) {
@@ -113,9 +111,9 @@ public class Client {
 
                 Mutable.IntegerValue sessionId = new Mutable.IntegerValue();
 
-                mBus.enableConcurrentCallbacks();
+                mBus1.enableConcurrentCallbacks();
 
-                Status status = mBus.joinSession(name, contactPort, sessionId, sessionOpts, new SessionListener());
+                Status status = mBus1.joinSession(name, contactPort, sessionId, sessionOpts, new SessionListener());
                 if (status != Status.OK) {
                     return;
                 }
@@ -134,12 +132,12 @@ public class Client {
 
         }
 
-        mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
+        mBus1 = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
 
         BusListener listener = new MyBusListener();
-        mBus.registerBusListener(listener);
+        mBus1.registerBusListener(listener);
 
-        Status status = mBus.connect();
+        Status status = mBus1.connect();
         if (status != Status.OK) {
             return;
         }
@@ -147,7 +145,7 @@ public class Client {
 
         SampleSignalHandler mySignalHandlers = new SampleSignalHandler();
 
-        status = mBus.registerSignalHandlers(mySignalHandlers);
+        status = mBus1.registerSignalHandlers(mySignalHandlers);
         if (status != Status.OK) {
             System.out.println(status);
             return;
@@ -155,7 +153,7 @@ public class Client {
         System.out.println("BusAttachment.registerSignalHandlers successful");
 
         mySignalInterface = new SignalInterface();
-        status = mBus.registerBusObject(mySignalInterface, "/MyService/Path");
+        status = mBus1.registerBusObject(mySignalInterface, "/MyService/Path");
         if (status != status.OK) {
             System.out.println("SignalInterface not registered");
             return;
@@ -163,7 +161,7 @@ public class Client {
 
         System.out.println("BusAttachment.registerSignalInterface successful");
 
-        status = mBus.findAdvertisedName("com.my.well.known.name");
+        status = mBus1.findAdvertisedName("com.my.well.known.name");
         if (status != Status.OK) {
             return;
         }
@@ -180,27 +178,23 @@ public class Client {
 
         System.out.println("start playing");
         in = new ByteArrayInputStream(mu_data);
-        /*Player mp3player = new Player(in);
-         mp3player.play();
-         /*while(true) {
-         try {
-         Thread.sleep(5000);
-         } catch (InterruptedException e) {
-         System.out.println("Program interupted");
-         }
-         }*/
+
         while (true) {
             Thread.sleep(1000);
         }
     }
+
+    public static void main(String[] args) {
+
+    }
 }
 
-class musicPlayer extends TimerTask {
+class muPlayer extends TimerTask {
 
     ByteArrayInputStream data;
     static Player mp3player;
 
-    public musicPlayer(ByteArrayInputStream in) {
+    public muPlayer(ByteArrayInputStream in) {
         this.data = in;
     }
 
