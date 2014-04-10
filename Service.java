@@ -45,7 +45,13 @@ public class Service {
     static int mSessionId;
     static String mJoinerName;
     private static FileInputStream in;
-    
+    static long previous_time;
+    private static Timer t1;
+    static long time_left = 10000;
+    static Boolean first_try = true;
+    static TimerTask music_player;
+    static long delay=0;
+    static int delay_count=0;
     // data is sent through the interface
     public static class SignalInterface implements SampleInterface, BusObject {
 
@@ -55,8 +61,13 @@ public class Service {
         }
 
         @Override
-        public void clock_sync(long countdown) throws BusException {
+        public void clock_sync(long countdown, long delay) throws BusException {
             // No implementation required for sending data
+        }
+
+        @Override
+        public void delay_est() throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
     }
@@ -64,11 +75,30 @@ public class Service {
     public static class SampleSignalHandler {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(int countdown){
+        public void clock_sync(long count_down, long delay) throws BusException, FileNotFoundException {
+
             
         }
+
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
+        public void delay_est() throws IOException, BusException {
+            delay_count++;
+            if(delay < (System.currentTimeMillis()-previous_time)){
+                delay=System.currentTimeMillis()-previous_time;
+            }
+            previous_time = System.currentTimeMillis();
+            if(delay_count<6){
+                myInterface.delay_est();
+            }
+            else{
+                new time_sync_Thread(myInterface,delay).start();
+                TimerTask music_player=new musicPlayerThread(in);
+                Timer t1=new Timer(true);
+                t1.schedule(music_player, 6*delay);
+            }
+        }
     }
-    
+
     private static class MyBusListener extends BusListener {
 
         public void nameOwnerChanged(String busName, String previousOwner, String newOwner) {
@@ -139,7 +169,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.request 'com.my.well.known.name' successful");
-        
+
         SampleSignalHandler mySignalHandlers = new SampleSignalHandler();
 
         status = mBus.registerSignalHandlers(mySignalHandlers);
@@ -148,7 +178,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.registerSignalHandlers successful");
-        
+
         status = mBus.advertiseName("com.my.well.known.name", SessionOpts.TRANSPORT_ANY);
         if (status != Status.OK) {
             System.out.println("Status = " + status);
@@ -156,7 +186,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.advertiseName 'com.my.well.known.name' successful");
-        
+
         try {
             while (!mSessionEstablished) {
                 Thread.sleep(10);
@@ -167,19 +197,22 @@ public class Service {
             SignalEmitter emitter = new SignalEmitter(mySignalInterface, mSessionId, SignalEmitter.GlobalBroadcast.On);
 
             myInterface = emitter.getInterface(SampleInterface.class);
-            
-            Scanner i= new Scanner(System.in);
+
+            Scanner i = new Scanner(System.in);
             System.out.println("Please press enter to play");
-            
+
             i.nextLine();
-            
+
             in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
-            FileInputStream in2=new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
-            TimerTask music_player=new musicPlayerThread(in);
-            Timer t1=new Timer(true);
-            t1.schedule(music_player, 600);
-            new time_sync_Thread(myInterface).start();
+            FileInputStream in2 = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
+            myInterface.delay_est();
+            previous_time = System.currentTimeMillis();
+
+            //TimerTask music_player=new musicPlayerThread(in);
+            //Timer t1=new Timer(true);
+            //t1.schedule(music_player, 600);
+            //new time_sync_Thread(myInterface).start();
             while (true) {
                 int len = in2.available();
                 if (len > 50000) {
@@ -195,51 +228,61 @@ public class Service {
         } catch (BusException ex) {
             System.out.println("Bus Exception: " + ex.toString());
         }
-        while(true){
+        while (true) {
             Thread.sleep(1000);
         }
     }
 }
 
 class musicPlayerThread extends TimerTask {
-FileInputStream data;
-  public musicPlayerThread(FileInputStream in) {
-    this.data=in;
-  }
 
-  public void run() {
-  Player mp3player;
-    try {
-        mp3player = new Player(data);
-        mp3player.play();
-    } catch (JavaLayerException ex) {
-        Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
+    FileInputStream data;
+    static Player mp3player;
+    public musicPlayerThread(FileInputStream in) {
+        this.data = in;
     }
-  
-  }
+    public static void stop(){
+        mp3player.close();
+    }
+    
+    public void run() {
+        
+        try {
+            System.out.println("player "+System.currentTimeMillis());
+            mp3player = new Player(data);
+            mp3player.play();
+        } catch (JavaLayerException ex) {
+            Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+    }
 }
+
 
 class time_sync_Thread extends Thread {
 SampleInterface myInterface;
-  public time_sync_Thread(SampleInterface i) {
+long delay;
+  public time_sync_Thread(SampleInterface i,long de_lay) {
     myInterface=i;
+    delay=de_lay;
   }
 
   public void run() {
-  long time=600;
+  long time=6*delay;
+  
   for(int i=0;i<5;i++){
     try {
-        myInterface.clock_sync(time);
+        myInterface.clock_sync(time,delay);
     } catch (BusException ex) {
         Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
     }
     try {
-        Thread.sleep(100);
+        Thread.sleep(delay);
     } catch (InterruptedException ex) {
         Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
     }
     
-    time=time-100;
+    time=time-delay;
   }
   }
 }

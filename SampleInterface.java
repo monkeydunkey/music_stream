@@ -23,7 +23,9 @@ public interface SampleInterface {
     public void music_data(byte[] data) throws BusException;
     
     @BusSignal
-    public void clock_sync(long countdown)throws BusException;
+    public void clock_sync(long countdown, long delay)throws BusException;
     
+    @BusSignal
+    public void delay_est() throws BusException;
 }
 

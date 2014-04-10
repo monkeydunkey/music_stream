@@ -11,6 +11,7 @@ package music_stream;
  */
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -49,6 +50,8 @@ public class Client {
     private static ByteArrayInputStream in;
     private static Boolean time_sync_completed = false;
     private static Date date = new Date();
+    private static Timer t1;
+    private static TimerTask music_player = null;
 
     public static class SampleSignalHandler {
 
@@ -62,26 +65,21 @@ public class Client {
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(long count_down) {
-
+        public void clock_sync(long count_down, long delay) throws BusException {
             if (time_sync_count == 0) {
                 previous_time = System.currentTimeMillis();
-                System.out.println(previous_time);
-                time_left = count_down;
+                time_left = count_down - 3*delay/4;
                 time_sync_count++;
             } else {
-                if (System.currentTimeMillis() - previous_time < 100) {
-                    /*System.out.println(System.currentTimeMillis());
-                    System.out.println(previous_time);
-                    System.out.println("");*/
-                    time_left = count_down;
-                } else {
-                    
-                    time_left -= (System.currentTimeMillis() - previous_time);
+                if (System.currentTimeMillis() - previous_time < delay) {
+                    time_left = count_down - 3*delay/4;
+                }
+                else{
+                    time_left -= System.currentTimeMillis() - previous_time;
                 }
                 previous_time = System.currentTimeMillis();
-                
-                //System.out.println(previous_time);
+                System.out.println("time_left " + count_down);
+
                 time_sync_count++;
 
                 if (time_sync_count == 5) {
@@ -94,6 +92,12 @@ public class Client {
                 }
             }
         }
+
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
+        public void delay_est() throws IOException, BusException {
+            myInterface.delay_est();
+
+        }
     }
 
     public static class SignalInterface implements SampleInterface, BusObject {
@@ -104,8 +108,13 @@ public class Client {
         }
 
         @Override
-        public void clock_sync(long count_down) throws BusException {
+        public void clock_sync(long count_down, long delay) throws BusException {
 
+        }
+
+        @Override
+        public void delay_est() throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
     }
@@ -179,6 +188,7 @@ public class Client {
         if (status != Status.OK) {
             return;
         }
+        previous_time = 0;
         System.out.println("BusAttachment.findAdvertisedName successful " + "com.my.well.known.name");
         while (!connected) {
             System.out.println("it's stuck");
@@ -209,14 +219,20 @@ public class Client {
 class musicPlayer extends TimerTask {
 
     ByteArrayInputStream data;
+    static Player mp3player;
 
     public musicPlayer(ByteArrayInputStream in) {
         this.data = in;
     }
 
+    public static void stop() {
+        mp3player.close();
+    }
+
     public void run() {
-        Player mp3player;
+
         try {
+            System.out.println("player "+System.currentTimeMillis());
             mp3player = new Player(data);
             mp3player.play();
         } catch (JavaLayerException ex) {
