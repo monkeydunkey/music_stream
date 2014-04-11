@@ -53,6 +53,10 @@ public class Client {
     private static Timer t1;
     private static TimerTask music_player = null;
 
+    private static long t11, t21, t22, t12, t13, t23;
+    private static int step = 0;
+    private static long alpha, lat, off;
+
     public static class SampleSignalHandler {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "music_data")
@@ -65,16 +69,35 @@ public class Client {
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(long count_down, long delay) throws BusException {
-            TimerTask music_player = new musicPlayer(in);
-            Timer t1 = new Timer(true);
-            t1.schedule(music_player, count_down);
+        public void clock_sync(long count_down) throws BusException {
+            long val = alpha * count_down + off - lat;
+            musicPlayer mp3player = new musicPlayer(in);
+            t1 = new Timer(true);
+            t1.schedule(mp3player, val);
 
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
-        public void delay_est() throws IOException, BusException {
-            myInterface.delay_est();
+        public void delay_est(long time_stamp, long time_stamp_pre) throws IOException, BusException {
+            if (step == 0) {
+                System.out.println("hi");
+                t11 = time_stamp;
+                t21 = System.currentTimeMillis();
+                t22 = t21;
+                myInterface.delay_est(time_stamp, time_stamp_pre);
+                step++;
+            } else {
+                System.out.println("hiiiii");
+                if (step == 1) {
+                    t12 = time_stamp_pre;
+                    t13 = time_stamp;
+                    t23 = System.currentTimeMillis();
+                    alpha = (t13 - t11) / (t23 - t21);
+                    lat = ((t12 - t11) - alpha * (t22 - t21)) / 2;
+                    off = (t21 - t11) - lat;
+                    myInterface.delay_est(time_stamp, time_stamp_pre);
+                }
+            }
 
         }
     }
@@ -87,13 +110,13 @@ public class Client {
         }
 
         @Override
-        public void clock_sync(long count_down, long delay) throws BusException {
+        public void clock_sync(long count_down) throws BusException {
 
         }
 
         @Override
-        public void delay_est() throws BusException {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        public void delay_est(long time_stamp, long time_stamo_pre) throws BusException {
+
         }
 
     }

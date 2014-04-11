@@ -73,7 +73,7 @@ public class service_client {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
         public void delay_est() throws IOException, BusException {
-            myInterface.delay_est();
+            //myInterface.delay_est();
 
         }
     }
@@ -86,12 +86,12 @@ public class service_client {
         }
 
         @Override
-        public void clock_sync(long count_down, long delay) throws BusException {
+        public void clock_sync(long count_down) throws BusException {
 
         }
 
         @Override
-        public void delay_est() throws BusException {
+        public void delay_est(long timestamp, long delay) throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 

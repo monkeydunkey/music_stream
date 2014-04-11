@@ -61,12 +61,12 @@ public class Service {
         }
 
         @Override
-        public void clock_sync(long countdown, long delay) throws BusException {
+        public void clock_sync(long countdown) throws BusException {
             // No implementation required for sending data
         }
 
         @Override
-        public void delay_est() throws BusException {
+        public void delay_est(long time_stamp,long previous_time) throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
@@ -75,26 +75,34 @@ public class Service {
     public static class SampleSignalHandler {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(long count_down, long delay) throws BusException, FileNotFoundException {
+        public void clock_sync(long count_down) throws BusException, FileNotFoundException {
 
             
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
-        public void delay_est() throws IOException, BusException {
+        public void delay_est(long time_stamp,long time_stamp_pre) throws IOException, BusException, InterruptedException {
             delay_count++;
-            if(delay < (System.currentTimeMillis()-previous_time)){
-                delay=System.currentTimeMillis()-previous_time;
+            System.out.println("it hererer");
+            long received=System.currentTimeMillis();
+            if(received - previous_time > delay){
+               delay = received - previous_time;
             }
-            previous_time = System.currentTimeMillis();
-            if(delay_count<6){
-                myInterface.delay_est();
+            if(delay_count>=2){
+                System.out.println("delay"+delay);
+                myInterface.clock_sync(2*delay);
+                musicPlayerThread mp3player=new musicPlayerThread(in);
+                
+                t1=new Timer(true);
+                System.out.println("player is about to start");
+                t1.schedule(mp3player, 2*delay);
+                
             }
             else{
-                new time_sync_Thread(myInterface,delay).start();
-                TimerTask music_player=new musicPlayerThread(in);
-                Timer t1=new Timer(true);
-                t1.schedule(music_player, 6*delay);
+                Thread.sleep(60);
+                System.out.println("pre gets updated");
+                myInterface.delay_est(System.currentTimeMillis(),received );
+                previous_time=System.currentTimeMillis();
             }
         }
     }
@@ -186,7 +194,7 @@ public class Service {
             return;
         }
         System.out.println("BusAttachment.advertiseName 'com.my.well.known.name' successful");
-        new client_thread().start();
+        //new client_thread().start();
         try {
             while (!mSessionEstablished) {
                 Thread.sleep(10);
@@ -206,8 +214,10 @@ public class Service {
             in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
             FileInputStream in2 = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
-            myInterface.clock_sync(500, 0);
-            
+            System.out.println("current time"+System.currentTimeMillis());
+            previous_time=System.currentTimeMillis();
+            myInterface.delay_est(System.currentTimeMillis(),0);
+            Thread.sleep(10);
             //TimerTask music_player=new musicPlayerThread(in);
             //Timer t1=new Timer(true);
             //t1.schedule(music_player, 600);
@@ -257,7 +267,7 @@ class musicPlayerThread extends TimerTask {
     }
 }
 
-
+/*
 class time_sync_Thread extends Thread {
 SampleInterface myInterface;
 long delay;
@@ -285,7 +295,7 @@ long delay;
   }
   }
 }
-
+*/
 class client_thread extends Thread{
     public void run(){
         try {
