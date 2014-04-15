@@ -9,14 +9,20 @@ package music_stream;
  *
  * @author admin
  */
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import javazoom.jl.decoder.JavaLayerException;
 import org.alljoyn.bus.BusAttachment;
 import org.alljoyn.bus.BusException;
@@ -30,6 +36,7 @@ import org.alljoyn.bus.SignalEmitter;
 import org.alljoyn.bus.Status;
 import javazoom.jl.player.Player;
 import org.alljoyn.bus.annotation.BusSignalHandler;
+import org.tritonus.share.sampled.file.TAudioFileFormat;
 
 public class Service {
 
@@ -41,17 +48,21 @@ public class Service {
     private static SampleInterface myInterface;
 //	static private SignalInterface gSignalInterface;
 
-    static boolean mSessionEstablished = false;
-    static int mSessionId;
-    static String mJoinerName;
+    private static boolean mSessionEstablished = false;
+    private static int mSessionId;
+    private static String mJoinerName;
     private static FileInputStream in;
-    static long previous_time;
+    private static long previous_time;
     private static Timer t1;
-    static long time_left = 10000;
-    static Boolean first_try = true;
-    static TimerTask music_player;
-    static long delay=0;
-    static int delay_count=0;
+    private static long time_left = 10000;
+    private static Boolean first_try = true;
+    private static TimerTask music_player;
+    private static long delay = 0;
+    private static int delay_count = 0;
+    private static long curr_file_dur;
+    private static Thread music_player_handler;
+    private static ArrayList<String> filelist;
+
     // data is sent through the interface
     public static class SignalInterface implements SampleInterface, BusObject {
 
@@ -66,7 +77,12 @@ public class Service {
         }
 
         @Override
-        public void delay_est(long time_stamp,long previous_time) throws BusException {
+        public void delay_est(long time_stamp, long previous_time) throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void song_change(long duration) throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
@@ -77,33 +93,60 @@ public class Service {
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
         public void clock_sync(long count_down) throws BusException, FileNotFoundException {
 
-            
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
-        public void delay_est(long time_stamp,long time_stamp_pre) throws IOException, BusException, InterruptedException {
+        public void delay_est(long time_stamp, long time_stamp_pre) throws IOException, BusException, InterruptedException {
             delay_count++;
             System.out.println("it hererer");
-            long received=System.currentTimeMillis();
-            if(received - previous_time > delay){
-               delay = received - previous_time;
+            long received = System.currentTimeMillis();
+            if (received - previous_time > delay) {
+                delay = received - previous_time;
             }
-            if(delay_count>=2){
-                System.out.println("delay"+delay);
-                myInterface.clock_sync(2*delay);
-                musicPlayerThread mp3player=new musicPlayerThread(in);
-                
-                t1=new Timer(true);
-                System.out.println("player is about to start");
-                t1.schedule(mp3player, 2*delay);
-                
-            }
-            else{
+            if (delay_count >= 2) {
+                System.out.println("delay" + delay);
+                myInterface.clock_sync(2 * delay);
+
+            } else {
                 Thread.sleep(60);
                 System.out.println("pre gets updated");
-                myInterface.delay_est(System.currentTimeMillis(),received );
-                previous_time=System.currentTimeMillis();
+                myInterface.delay_est(System.currentTimeMillis(), received);
+                previous_time = System.currentTimeMillis();
             }
+        }
+    }
+
+    public static void asyncMusicPlay(final long delay) {
+        Runnable task = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    play_music(delay);
+                } catch (Exception ex) {
+                    System.out.println("music player handler cannot be started");
+                }
+            }
+        };
+        music_player_handler = new Thread(task, "musicThread");
+        music_player_handler.start();
+    }
+
+    public static void play_music(long delay) throws InterruptedException, IOException {
+        musicPlayerThread mp3player = new musicPlayerThread(in);
+        Timer t1 = new Timer(true);
+        t1.schedule(mp3player, delay);
+        Thread.sleep(delay + curr_file_dur);
+        in.close();
+        for (int j = 1; j < filelist.size(); j++) {
+            in=new FileInputStream(filelist.get(j));
+            mp3player = new musicPlayerThread(in);
+            t1 = new Timer(true);
+            System.out.println("player is about to start");
+            t1.schedule(mp3player, 500);
+
+            Thread.sleep(curr_file_dur);
+            Thread.sleep(500); //for providing gap bwetween music
+            in.close();
         }
     }
 
@@ -116,7 +159,7 @@ public class Service {
         }
     }
 
-    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException {
+    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException {
 
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
@@ -211,26 +254,51 @@ public class Service {
 
             i.nextLine();
 
-            in = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
             //for data sending purpose
-            FileInputStream in2 = new FileInputStream("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
-            System.out.println("current time"+System.currentTimeMillis());
-            previous_time=System.currentTimeMillis();
-            myInterface.delay_est(System.currentTimeMillis(),0);
-            Thread.sleep(10);
+            System.out.println("current time" + System.currentTimeMillis());
+            previous_time = System.currentTimeMillis();
+
             //TimerTask music_player=new musicPlayerThread(in);
             //Timer t1=new Timer(true);
             //t1.schedule(music_player, 600);
             //new time_sync_Thread(myInterface).start();
-            while (true) {
-                int len = in2.available();
-                if (len > 50000) {
-                    len = 50000;
+            filelist = new ArrayList<String>();
+            filelist.add("C:\\Users\\admin\\Documents\\test_sound.mp3");
+            filelist.add("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
+            in = new FileInputStream(filelist.get(0));
+            FileInputStream in2 = new FileInputStream(filelist.get(0));
+
+            long[] music_duration = new long[filelist.size()];
+            for (int j = 0; j < filelist.size(); j++) {
+                music_duration[j] = DurationWithMp3Spi(filelist.get(j));
+            }
+
+            boolean first = true;
+            myInterface.delay_est(System.currentTimeMillis(), 0);
+            for (int j = 0; j < filelist.size(); j++) {
+                in2 = new FileInputStream(filelist.get(j));
+                curr_file_dur = music_duration[j];
+
+                myInterface.song_change(music_duration[j]);
+                System.out.println("song change " + curr_file_dur);
+
+                int sleep_count = 0;
+                while (in2.available() > 0) {
+                    System.out.println("data transfered");
+                    int len = in2.available();
+                    if (len > 50000) {
+                        len = 50000;
+                    }
+                    byte[] data = new byte[len];
+                    in2.read(data, 0, len);
+                    myInterface.music_data(data);
+                    sleep_count++;
+                    Thread.sleep(50);
+
                 }
-                byte[] data = new byte[len];
-                in2.read(data, 0, len);
-                myInterface.music_data(data);
-                Thread.sleep(60);
+                //in2.close();
+                Thread.sleep(curr_file_dur - (sleep_count * 150));
+
             }
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
@@ -241,23 +309,43 @@ public class Service {
             Thread.sleep(1000);
         }
     }
+
+    private static long DurationWithMp3Spi(String s) throws UnsupportedAudioFileException, IOException {
+        File f1 = new File(s);
+        AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(f1);
+        if (fileFormat instanceof TAudioFileFormat) {
+            Map<?, ?> properties = ((TAudioFileFormat) fileFormat).properties();
+            String key = "duration";
+            Long microseconds = (Long) properties.get(key);
+            long mili = (microseconds / 1000);
+            long sec = (mili / 1000) % 60;
+            long min = (mili / 1000) / 60;
+            System.out.println("time = " + min + ":" + sec);
+            return mili;
+        } else {
+            throw new UnsupportedAudioFileException();
+        }
+
+    }
 }
 
 class musicPlayerThread extends TimerTask {
 
     FileInputStream data;
     static Player mp3player;
+
     public musicPlayerThread(FileInputStream in) {
         this.data = in;
     }
-    public static void stop(){
+
+    public static void stop() {
         mp3player.close();
     }
-    
+
     public void run() {
-        
+
         try {
-            System.out.println("player "+System.currentTimeMillis());
+            System.out.println("player " + System.currentTimeMillis());
             mp3player = new Player(data);
             mp3player.play();
         } catch (JavaLayerException ex) {
@@ -268,44 +356,31 @@ class musicPlayerThread extends TimerTask {
 }
 
 /*
-class time_sync_Thread extends Thread {
-SampleInterface myInterface;
-long delay;
-  public time_sync_Thread(SampleInterface i,long de_lay) {
-    myInterface=i;
-    delay=de_lay;
-  }
+ class time_sync_Thread extends Thread {
+ SampleInterface myInterface;
+ long delay;
+ public time_sync_Thread(SampleInterface i,long de_lay) {
+ myInterface=i;
+ delay=de_lay;
+ }
 
-  public void run() {
-  long time=6*delay;
+ public void run() {
+ long time=6*delay;
   
-  for(int i=0;i<5;i++){
-    try {
-        myInterface.clock_sync(time,delay);
-    } catch (BusException ex) {
-        Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
-    }
-    try {
-        Thread.sleep(6*delay/10);
-    } catch (InterruptedException ex) {
-        Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
-    }
+ for(int i=0;i<5;i++){
+ try {
+ myInterface.clock_sync(time,delay);
+ } catch (BusException ex) {
+ Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
+ }
+ try {
+ Thread.sleep(6*delay/10);
+ } catch (InterruptedException ex) {
+ Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
+ }
     
-    time=time-(6*delay/10);
-  }
-  }
-}
-*/
-class client_thread extends Thread{
-    public void run(){
-        try {
-            service_client.run();
-        } catch (JavaLayerException ex) {
-            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (BusException ex) {
-            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (InterruptedException ex) {
-            Logger.getLogger(client_thread.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-}
+ time=time-(6*delay/10);
+ }
+ }
+ }
+ */

@@ -29,6 +29,7 @@ import org.alljoyn.bus.SessionOpts;
 import org.alljoyn.bus.SignalEmitter;
 import org.alljoyn.bus.Status;
 import org.alljoyn.bus.annotation.BusSignalHandler;
+import java.util.concurrent.FutureTask;
 
 public class Client {
 
@@ -38,11 +39,14 @@ public class Client {
     private static final short CONTACT_PORT = 42;
     static BusAttachment mBus;
     private static byte[] mu_data = new byte[10000000];
+    private static byte[] mu_data_1 = new byte[10000000];
+    private static Boolean which_buffer = false;
+    private static long curr_file_duration;
     private static int offset = 0;
     private static Boolean connected = false;
     private static Boolean connection_ready = false;
     private static SignalInterface mySignalInterface = null;
-    private static SampleInterface myInterface;
+    private static SampleInterface myInterface_1;
     private static Boolean Start_playing = false;
     private static int time_sync_count = 0;
     private static long time_left = 0;
@@ -52,28 +56,37 @@ public class Client {
     private static Date date = new Date();
     private static Timer t1;
     private static TimerTask music_player = null;
+    private static Thread music_player_handler;
 
     private static long t11, t21, t22, t12, t13, t23;
     private static int step = 0;
-    private static long alpha, lat, off;
+    private static double alpha, lat, off;
 
     public static class SampleSignalHandler {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "music_data")
         public void music_data(byte[] data) {
-            int j = 0;
-            for (int i = offset; i < offset + data.length; i++, j++) {
-                mu_data[i] = data[j];
+            System.out.println("data received");
+            if (which_buffer) {
+                int j = 0;
+                for (int i = offset; i < offset + data.length; i++, j++) {
+                    mu_data[i] = data[j];
+                }
+                offset += data.length;
+            } else {
+                int j = 0;
+                for (int i = offset; i < offset + data.length; i++, j++) {
+                    mu_data_1[i] = data[j];
+                }
+                offset += data.length;
             }
-            offset += data.length;
         }
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
-        public void clock_sync(long count_down) throws BusException {
-            long val = alpha * count_down + off - lat;
-            musicPlayer mp3player = new musicPlayer(in);
-            t1 = new Timer(true);
-            t1.schedule(mp3player, val);
+        public void clock_sync(long count_down) throws BusException, InterruptedException, IOException {
+            double val = count_down - lat;
+            asyncMusicPlay((long)val);
+            
 
         }
 
@@ -84,7 +97,7 @@ public class Client {
                 t11 = time_stamp;
                 t21 = System.currentTimeMillis();
                 t22 = t21;
-                myInterface.delay_est(time_stamp, time_stamp_pre);
+                myInterface_1.delay_est(time_stamp, time_stamp_pre);
                 step++;
             } else {
                 System.out.println("hiiiii");
@@ -92,13 +105,73 @@ public class Client {
                     t12 = time_stamp_pre;
                     t13 = time_stamp;
                     t23 = System.currentTimeMillis();
-                    alpha = (t13 - t11) / (t23 - t21);
-                    lat = ((t12 - t11) - alpha * (t22 - t21)) / 2;
+                    alpha = (double) (t13 - t11) / (double) (t23 - t21);
+                    lat = ((double) (t12 - t11) - alpha * (double) (t22 - t21)) / 2;
                     off = (t21 - t11) - lat;
-                    myInterface.delay_est(time_stamp, time_stamp_pre);
+                    myInterface_1.delay_est(time_stamp, time_stamp_pre);
                 }
             }
 
+        }
+
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "song_change")
+        public void song_change(long duration) {
+            
+            which_buffer = !which_buffer;
+            curr_file_duration = duration;
+            offset = 0;
+            System.out.println("song change "+curr_file_duration);
+        }
+
+    }
+
+    private static Boolean first = true;
+
+    public static void asyncMusicPlay(final long delay){ 
+        Runnable task = new Runnable() {
+            @Override 
+            public void run() { 
+                try { 
+                   play_music(delay); 
+                } catch (Exception ex) { 
+                    System.out.println("music player handler cannot be started");
+                } 
+            } 
+        }; 
+       music_player_handler = new Thread(task, "musicThread");
+       music_player_handler.start(); 
+    }
+    
+    
+    public static void play_music(long delay) throws InterruptedException, IOException {
+        while (true) {
+            System.out.println(which_buffer);
+            if (which_buffer) {
+                in = new ByteArrayInputStream(mu_data);
+                musicPlayer mp3player = new musicPlayer(in);
+                t1 = new Timer(true);
+                if (first) {
+                    t1.schedule(mp3player, delay);
+                    first = false;
+                } else {
+                    t1.schedule(mp3player, 500);
+                }
+                System.out.println("player scheduled");    
+            } else {
+                in = new ByteArrayInputStream(mu_data_1);
+                musicPlayer mp3player = new musicPlayer(in);
+                t1 = new Timer(true);
+                if (first) {
+                    t1.schedule(mp3player, delay);
+                    first = false;
+                } else {
+                    t1.schedule(mp3player, 500);
+                }
+            }
+            
+            Thread.sleep(curr_file_duration);
+            
+            in.close();
         }
     }
 
@@ -117,6 +190,11 @@ public class Client {
         @Override
         public void delay_est(long time_stamp, long time_stamo_pre) throws BusException {
 
+        }
+
+        @Override
+        public void song_change(long duration) throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
     }
@@ -144,7 +222,7 @@ public class Client {
                 }
                 System.out.println(String.format("BusAttachement.joinSession successful sessionId = %d", sessionId.value));
                 SignalEmitter mySignalEmitter = new SignalEmitter(mySignalInterface, sessionId.value, SignalEmitter.GlobalBroadcast.On);
-                myInterface = mySignalEmitter.getInterface(SampleInterface.class);
+                myInterface_1 = mySignalEmitter.getInterface(SampleInterface.class);
                 connected = true;
                 System.out.println("we are here");
             }
@@ -237,6 +315,7 @@ class musicPlayer extends TimerTask {
             System.out.println("player " + System.currentTimeMillis());
             mp3player = new Player(data);
             mp3player.play();
+            System.out.println("player stopped");
         } catch (JavaLayerException ex) {
             Logger.getLogger(musicPlayerThread.class.getName()).log(Level.SEVERE, null, ex);
         }

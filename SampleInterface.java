@@ -27,5 +27,7 @@ public interface SampleInterface {
     
     @BusSignal
     public void delay_est(long time_stamp,long time_stamp_pre) throws BusException;
+    
+    @BusSignal
+    public void song_change(long duration) throws BusException;
 }
-
