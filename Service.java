@@ -60,8 +60,13 @@ public class Service {
     private static long delay = 0;
     private static int delay_count = 0;
     private static long curr_file_dur;
-    private static Thread music_player_handler;
+    private static Thread music_player_handler = null;
+    private static Boolean music_player_running = true;
+    private static data_transfer_thread data_transfer_handler = null;
+    private static Boolean data_transfer = true;
     private static ArrayList<String> filelist;
+    private static musicPlayerThread mp3player = null;
+    private static long[] music_duration;
 
     // data is sent through the interface
     public static class SignalInterface implements SampleInterface, BusObject {
@@ -106,7 +111,7 @@ public class Service {
             if (delay_count >= 2) {
                 System.out.println("delay" + delay);
                 myInterface.clock_sync(2 * delay);
-                asyncMusicPlay(2*delay);
+                asyncMusicPlay(2 * delay);
 
             } else {
                 Thread.sleep(60);
@@ -133,14 +138,14 @@ public class Service {
     }
 
     public static void play_music(long delay) throws InterruptedException, IOException {
-        
-        musicPlayerThread mp3player = new musicPlayerThread(in);
+
+        mp3player = new musicPlayerThread(in);
         Timer t1 = new Timer(true);
         t1.schedule(mp3player, delay);
         Thread.sleep(delay + curr_file_dur);
         in.close();
         for (int j = 1; j < filelist.size(); j++) {
-            in=new FileInputStream(filelist.get(j));
+            in = new FileInputStream(filelist.get(j));
             mp3player = new musicPlayerThread(in);
             t1 = new Timer(true);
             System.out.println("player is about to start");
@@ -149,8 +154,53 @@ public class Service {
             Thread.sleep(curr_file_dur);
             Thread.sleep(500); //for providing gap bwetween music
             in.close();
+            if (!music_player_running) {
+                break;
+            }
         }
     }
+
+    public static void play() throws FileNotFoundException, UnsupportedAudioFileException, IOException, BusException, InterruptedException {
+        System.out.println("current time" + System.currentTimeMillis());
+        previous_time = System.currentTimeMillis();
+
+        in = new FileInputStream(filelist.get(0));
+
+        music_duration = new long[filelist.size()];
+        for (int j = 0; j < filelist.size(); j++) {
+            music_duration[j] = DurationWithMp3Spi(filelist.get(j));
+        }
+
+        sync();
+
+    }
+
+    public void add_song(ArrayList<String> arr) {
+        filelist = new ArrayList<String>();
+        for (int i = 0; i < arr.size(); i++) {
+            filelist.add(arr.get(i));
+        }
+    }
+
+    public static void sync() throws UnsupportedAudioFileException, IOException, BusException, InterruptedException {
+        if (mp3player != null) {
+            mp3player.stop();
+        }
+        if(data_transfer_handler!=null){
+            data_transfer_handler.set_running(false);
+        }
+        music_player_running = false;
+        
+        myInterface.delay_est(System.currentTimeMillis(), 0);
+        data_transfer_handler = new data_transfer_thread(filelist, myInterface, music_duration);
+        
+    }
+
+    public static void set_curr_file_dur(long dur) {
+        curr_file_dur = dur;
+    }
+
+    
 
     private static class MyBusListener extends BusListener {
 
@@ -257,55 +307,8 @@ public class Service {
             i.nextLine();
 
             //for data sending purpose
-            System.out.println("current time" + System.currentTimeMillis());
-            previous_time = System.currentTimeMillis();
-
-            //TimerTask music_player=new musicPlayerThread(in);
-            //Timer t1=new Timer(true);
-            //t1.schedule(music_player, 600);
-            //new time_sync_Thread(myInterface).start();
-            filelist = new ArrayList<String>();
-            filelist.add("C:\\Users\\admin\\Documents\\test_sound.mp3");
-            filelist.add("C:\\Users\\admin\\Music\\Maroon5-Misery.mp3");
-            in = new FileInputStream(filelist.get(0));
-            FileInputStream in2 = new FileInputStream(filelist.get(0));
-
-            long[] music_duration = new long[filelist.size()];
-            for (int j = 0; j < filelist.size(); j++) {
-                music_duration[j] = DurationWithMp3Spi(filelist.get(j));
-            }
-
-            boolean first = true;
-            myInterface.delay_est(System.currentTimeMillis(), 0);
-            for (int j = 0; j < filelist.size(); j++) {
-                in2 = new FileInputStream(filelist.get(j));
-                curr_file_dur = music_duration[j];
-
-                myInterface.song_change(music_duration[j]);
-                System.out.println("song change " + curr_file_dur);
-
-                int sleep_count = 0;
-                while (in2.available() > 0) {
-                    //System.out.println("data transfered");
-                    int len = in2.available();
-                    if (len > 50000) {
-                        len = 50000;
-                    }
-                    byte[] data = new byte[len];
-                    in2.read(data, 0, len);
-                    myInterface.music_data(data);
-                    sleep_count++;
-                    Thread.sleep(50);
-
-                }
-                //in2.close();
-                Thread.sleep(curr_file_dur - (sleep_count * 150));
-
-            }
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
-        } catch (BusException ex) {
-            System.out.println("Bus Exception: " + ex.toString());
         }
         while (true) {
             Thread.sleep(1000);
@@ -340,7 +343,7 @@ class musicPlayerThread extends TimerTask {
         this.data = in;
     }
 
-    public static void stop() {
+    public void stop() {
         mp3player.close();
     }
 
@@ -357,6 +360,69 @@ class musicPlayerThread extends TimerTask {
     }
 }
 
+class data_transfer_thread extends Thread {
+
+    public ArrayList<String> filelist;
+    public SampleInterface myInterface;
+    public long[] music_duration;
+    public Boolean running;
+
+    public data_transfer_thread(ArrayList<String> files, SampleInterface Interface, long[] music_length) {
+        filelist = files;
+        myInterface = Interface;
+        music_duration = music_length;
+        running = true;
+    }
+
+    public void set_running(Boolean flag){
+        running = false;
+    } 
+    public void run() {
+        FileInputStream in2;
+        try {
+            in2 = new FileInputStream(filelist.get(0));
+            myInterface.delay_est(System.currentTimeMillis(), 0);
+            for (int j = 0; j < filelist.size(); j++) {
+                if (running) {
+                    in2 = new FileInputStream(filelist.get(j));
+                    long curr_file_dur = music_duration[j];
+                    Service.set_curr_file_dur(curr_file_dur);
+                    myInterface.song_change(music_duration[j]);
+                    System.out.println("song change " + curr_file_dur);
+
+                    int sleep_count = 0;
+                    while (in2.available() > 0) {
+                        //System.out.println("data transfered");
+                        int len = in2.available();
+                        if (len > 50000) {
+                            len = 50000;
+                        }
+                        byte[] data = new byte[len];
+                        in2.read(data, 0, len);
+                        myInterface.music_data(data);
+                        sleep_count++;
+                        Thread.sleep(50);
+
+                    }
+                    //in2.close();
+                    Thread.sleep(curr_file_dur - (sleep_count * 150));
+                }
+                else{
+                    break;
+                }
+            }
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(data_transfer_thread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (BusException ex) {
+            Logger.getLogger(data_transfer_thread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(data_transfer_thread.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(data_transfer_thread.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+    }
+}
 /*
  class time_sync_Thread extends Thread {
  SampleInterface myInterface;
