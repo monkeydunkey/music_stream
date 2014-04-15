@@ -56,6 +56,7 @@ public class Client {
     private static Date date = new Date();
     private static Timer t1;
     private static TimerTask music_player = null;
+    private static musicPlayer mp3player = null;
     private static Thread music_player_handler;
 
     private static long t11, t21, t22, t12, t13, t23;
@@ -122,7 +123,16 @@ public class Client {
             offset = 0;
             System.out.println("song change "+curr_file_duration);
         }
-
+        
+        @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "re_sync")
+        public void re_sync(){
+        offset=0;
+        which_buffer=false;
+        if(mp3player!=null){
+            mp3player.stop();
+        }
+        
+        }
     }
 
     private static Boolean first = true;
@@ -148,7 +158,7 @@ public class Client {
             System.out.println(which_buffer);
             if (which_buffer) {
                 in = new ByteArrayInputStream(mu_data);
-                musicPlayer mp3player = new musicPlayer(in);
+                mp3player = new musicPlayer(in);
                 t1 = new Timer(true);
                 if (first) {
                     t1.schedule(mp3player, delay);
@@ -159,7 +169,7 @@ public class Client {
                 System.out.println("player scheduled");    
             } else {
                 in = new ByteArrayInputStream(mu_data_1);
-                musicPlayer mp3player = new musicPlayer(in);
+                mp3player = new musicPlayer(in);
                 t1 = new Timer(true);
                 if (first) {
                     t1.schedule(mp3player, delay);
@@ -197,11 +207,15 @@ public class Client {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
+        @Override
+        public void re_sync() throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
     }
 
-    public static void main(String[] args) throws JavaLayerException, BusException, InterruptedException {
-
-        class MyBusListener extends BusListener {
+    public static void run_client() throws InterruptedException{
+                class MyBusListener extends BusListener {
 
             public void foundAdvertisedName(String name, short transport, String namePrefix) {
                 System.out.println(String.format("BusListener.foundAdvertisedName(%s, %d, %s)", name, transport, namePrefix));
@@ -294,6 +308,11 @@ public class Client {
             Thread.sleep(1000);
         }
     }
+    
+    public static void main(String[] args) throws JavaLayerException, BusException, InterruptedException {
+
+
+    }
 }
 
 class musicPlayer extends TimerTask {
@@ -305,7 +324,7 @@ class musicPlayer extends TimerTask {
         this.data = in;
     }
 
-    public static void stop() {
+    public void stop() {
         mp3player.close();
     }
 

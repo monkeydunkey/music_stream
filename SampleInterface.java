@@ -30,4 +30,7 @@ public interface SampleInterface {
     
     @BusSignal
     public void song_change(long duration) throws BusException;
+    
+    @BusSignal
+    public void re_sync() throws BusException;
 }

@@ -91,6 +91,11 @@ public class Service {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
+        @Override
+        public void re_sync() throws BusException {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
     }
 
     public static class SampleSignalHandler {
@@ -211,8 +216,7 @@ public class Service {
         }
     }
 
-    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException {
-
+    public static void run_client() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException{
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
 
@@ -313,6 +317,10 @@ public class Service {
         while (true) {
             Thread.sleep(1000);
         }
+    }
+    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException {
+
+        
     }
 
     private static long DurationWithMp3Spi(String s) throws UnsupportedAudioFileException, IOException {
