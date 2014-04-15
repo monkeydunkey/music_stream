@@ -196,6 +196,7 @@ public class Service {
         }
         music_player_running = false;
         
+        myInterface.re_sync();
         myInterface.delay_est(System.currentTimeMillis(), 0);
         data_transfer_handler = new data_transfer_thread(filelist, myInterface, music_duration);
         
@@ -216,7 +217,7 @@ public class Service {
         }
     }
 
-    public static void run_client() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException{
+    public static void run_service() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException{
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
 
@@ -304,12 +305,18 @@ public class Service {
             SignalEmitter emitter = new SignalEmitter(mySignalInterface, mSessionId, SignalEmitter.GlobalBroadcast.On);
 
             myInterface = emitter.getInterface(SampleInterface.class);
-
+            java.awt.EventQueue.invokeLater(new Runnable() {
+            public void run() {
+              new MusicPlayerGUI().setVisible(true);
+    
+            }
+        });
+            /*
             Scanner i = new Scanner(System.in);
             System.out.println("Please press enter to play");
 
             i.nextLine();
-
+            */
             //for data sending purpose
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
@@ -320,7 +327,7 @@ public class Service {
     }
     public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException {
 
-        
+        run_service();
     }
 
     private static long DurationWithMp3Spi(String s) throws UnsupportedAudioFileException, IOException {

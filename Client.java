@@ -311,7 +311,7 @@ public class Client {
     
     public static void main(String[] args) throws JavaLayerException, BusException, InterruptedException {
 
-
+        run_client();
     }
 }
 
