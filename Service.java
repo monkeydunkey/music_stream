@@ -106,6 +106,7 @@ public class Service {
             if (delay_count >= 2) {
                 System.out.println("delay" + delay);
                 myInterface.clock_sync(2 * delay);
+                asyncMusicPlay(2*delay);
 
             } else {
                 Thread.sleep(60);
@@ -132,6 +133,7 @@ public class Service {
     }
 
     public static void play_music(long delay) throws InterruptedException, IOException {
+        
         musicPlayerThread mp3player = new musicPlayerThread(in);
         Timer t1 = new Timer(true);
         t1.schedule(mp3player, delay);
@@ -284,7 +286,7 @@ public class Service {
 
                 int sleep_count = 0;
                 while (in2.available() > 0) {
-                    System.out.println("data transfered");
+                    //System.out.println("data transfered");
                     int len = in2.available();
                     if (len > 50000) {
                         len = 50000;

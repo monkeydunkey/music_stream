@@ -66,7 +66,7 @@ public class Client {
 
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "music_data")
         public void music_data(byte[] data) {
-            System.out.println("data received");
+            //System.out.println("data received");
             if (which_buffer) {
                 int j = 0;
                 for (int i = offset; i < offset + data.length; i++, j++) {
@@ -169,7 +169,7 @@ public class Client {
                 }
             }
             
-            Thread.sleep(curr_file_duration);
+            Thread.sleep(curr_file_duration + delay);
             
             in.close();
         }
