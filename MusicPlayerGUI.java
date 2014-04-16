@@ -3,13 +3,18 @@ package music_stream;
 import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JList;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import org.alljoyn.bus.BusException;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -151,7 +156,7 @@ public class MusicPlayerGUI extends javax.swing.JFrame {
                  jFileChooser1.setMultiSelectionEnabled(true);
                  selectedFiles= jFileChooser1.getSelectedFiles();
                   for(File f : selectedFiles){
-                    model.addElement(f.getName());
+                    model.addElement(f.getAbsolutePath());
                     
                 }
                   
@@ -164,7 +169,27 @@ public class MusicPlayerGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_jFileChooser1ActionPerformed
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
-        // TODO add your handling code here:
+        ArrayList<String> filelist=new ArrayList<String>();
+        for(int i=0;i<model.size();i++){
+            String ss = model.get(i);
+            String temp=ss.replace("\\", "\\\\");
+            System.out.println(temp);
+            filelist.add(temp);
+        }
+        try {
+            
+            Service.add_song(filelist);
+            Service.play();
+        } catch (UnsupportedAudioFileException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (BusException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        jFileChooser1.setVisible(false);
     }//GEN-LAST:event_jButton1ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
@@ -174,7 +199,17 @@ public class MusicPlayerGUI extends javax.swing.JFrame {
     }//GEN-LAST:event_jButton3ActionPerformed
 
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton4ActionPerformed
-        // TODO add your handling code here:
+        try {
+            Service.sync();
+        } catch (UnsupportedAudioFileException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (BusException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
        jFileChooser1.setVisible(false);
     }//GEN-LAST:event_jButton4ActionPerformed
 

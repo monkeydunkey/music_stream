@@ -116,8 +116,9 @@ public class Service {
             if (delay_count >= 2) {
                 System.out.println("delay" + delay);
                 myInterface.clock_sync(2 * delay);
+                delay_count=0;
                 asyncMusicPlay(2 * delay);
-
+                
             } else {
                 Thread.sleep(60);
                 System.out.println("pre gets updated");
@@ -167,10 +168,6 @@ public class Service {
 
     public static void play() throws FileNotFoundException, UnsupportedAudioFileException, IOException, BusException, InterruptedException {
         System.out.println("current time" + System.currentTimeMillis());
-        previous_time = System.currentTimeMillis();
-
-        in = new FileInputStream(filelist.get(0));
-
         music_duration = new long[filelist.size()];
         for (int j = 0; j < filelist.size(); j++) {
             music_duration[j] = DurationWithMp3Spi(filelist.get(j));
@@ -180,7 +177,7 @@ public class Service {
 
     }
 
-    public void add_song(ArrayList<String> arr) {
+    public static void add_song(ArrayList<String> arr) {
         filelist = new ArrayList<String>();
         for (int i = 0; i < arr.size(); i++) {
             filelist.add(arr.get(i));
@@ -195,14 +192,22 @@ public class Service {
             data_transfer_handler.set_running(false);
         }
         music_player_running = false;
-        
         myInterface.re_sync();
-        myInterface.delay_est(System.currentTimeMillis(), 0);
+        delay_count=0;
+        if(in!=null){
+            in.close();
+        }
+        Thread.sleep(100);
+        in = new FileInputStream(filelist.get(0));
+        previous_time = System.currentTimeMillis();
+       // myInterface.delay_est(System.currentTimeMillis(), 0);
         data_transfer_handler = new data_transfer_thread(filelist, myInterface, music_duration);
+        data_transfer_handler.start();
         
     }
 
     public static void set_curr_file_dur(long dur) {
+        System.out.println("curr file duration"+dur);
         curr_file_dur = dur;
     }
 
@@ -217,7 +222,7 @@ public class Service {
         }
     }
 
-    public static void run_service() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException{
+    public static void run_service() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException, BusException{
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
 
@@ -305,12 +310,14 @@ public class Service {
             SignalEmitter emitter = new SignalEmitter(mySignalInterface, mSessionId, SignalEmitter.GlobalBroadcast.On);
 
             myInterface = emitter.getInterface(SampleInterface.class);
+            
             java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
               new MusicPlayerGUI().setVisible(true);
     
             }
         });
+            
             /*
             Scanner i = new Scanner(System.in);
             System.out.println("Please press enter to play");
@@ -325,12 +332,13 @@ public class Service {
             Thread.sleep(1000);
         }
     }
-    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException {
+    public static void main(String[] args) throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException, BusException {
 
         run_service();
     }
 
     private static long DurationWithMp3Spi(String s) throws UnsupportedAudioFileException, IOException {
+        System.out.println("file name "+s);
         File f1 = new File(s);
         AudioFileFormat fileFormat = AudioSystem.getAudioFileFormat(f1);
         if (fileFormat instanceof TAudioFileFormat) {
@@ -393,6 +401,7 @@ class data_transfer_thread extends Thread {
         running = false;
     } 
     public void run() {
+        System.out.println("Data transer starts");
         FileInputStream in2;
         try {
             in2 = new FileInputStream(filelist.get(0));
@@ -406,7 +415,7 @@ class data_transfer_thread extends Thread {
                     System.out.println("song change " + curr_file_dur);
 
                     int sleep_count = 0;
-                    while (in2.available() > 0) {
+                    while (in2.available() > 0 && running) {
                         //System.out.println("data transfered");
                         int len = in2.available();
                         if (len > 50000) {
@@ -414,7 +423,9 @@ class data_transfer_thread extends Thread {
                         }
                         byte[] data = new byte[len];
                         in2.read(data, 0, len);
+                        if(running){
                         myInterface.music_data(data);
+                        }
                         sleep_count++;
                         Thread.sleep(50);
 
@@ -425,6 +436,7 @@ class data_transfer_thread extends Thread {
                 else{
                     break;
                 }
+                System.out.println("data transfer stops");
             }
         } catch (FileNotFoundException ex) {
             Logger.getLogger(data_transfer_thread.class.getName()).log(Level.SEVERE, null, ex);

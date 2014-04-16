@@ -129,9 +129,11 @@ public class Client {
         offset=0;
         which_buffer=false;
         if(mp3player!=null){
+            
             mp3player.stop();
         }
-        
+        step=0;
+        first=true;        
         }
     }
 
@@ -325,6 +327,7 @@ class musicPlayer extends TimerTask {
     }
 
     public void stop() {
+        System.out.println("player stopped by method call");
         mp3player.close();
     }
 
