@@ -97,6 +97,11 @@ public class MusicPlayerGUI extends javax.swing.JFrame {
             });
 
             jButton2.setText("Stop");
+            jButton2.addActionListener(new java.awt.event.ActionListener() {
+                public void actionPerformed(java.awt.event.ActionEvent evt) {
+                    jButton2ActionPerformed(evt);
+                }
+            });
 
             jButton3.setText("Remove");
             jButton3.addActionListener(new java.awt.event.ActionListener() {
@@ -212,6 +217,16 @@ public class MusicPlayerGUI extends javax.swing.JFrame {
         }
        jFileChooser1.setVisible(false);
     }//GEN-LAST:event_jButton4ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        try {
+            Service.stop();
+        } catch (BusException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(MusicPlayerGUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_jButton2ActionPerformed
 
     /**
      * @param args the command line arguments

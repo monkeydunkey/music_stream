@@ -177,6 +177,22 @@ public class Service {
 
     }
 
+    public static void stop() throws BusException, IOException {
+        if (mp3player != null) {
+            mp3player.stop();
+        }
+        if(data_transfer_handler!=null){
+            data_transfer_handler.set_running(false);
+        }
+        music_player_running = false;
+        myInterface.re_sync();
+        delay_count=0;
+        if(in!=null){
+            in.close();
+        }
+        
+    }
+    
     public static void add_song(ArrayList<String> arr) {
         filelist = new ArrayList<String>();
         for (int i = 0; i < arr.size(); i++) {
