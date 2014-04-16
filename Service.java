@@ -1,13 +1,11 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/**
+* @SmartJoyn feature 3 - Group Play 
+*/
 package music_stream;
 
 /**
  *
- * @author admin
+ * @author Shashank
  */
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,35 +36,38 @@ import javazoom.jl.player.Player;
 import org.alljoyn.bus.annotation.BusSignalHandler;
 import org.tritonus.share.sampled.file.TAudioFileFormat;
 
+/** This is the service part of our group play feature. 
+ * This is accessible only to user who are creator of the channel. Only channel creator has the 
+ * right to choose the files that are to be played and the right to start and stop
+ * the stream. 
+*/
+
+
 public class Service {
 
     static {
         System.loadLibrary("alljoyn_java");
     }
 
-    private static final short CONTACT_PORT = 42;
-    private static SampleInterface myInterface;
-//	static private SignalInterface gSignalInterface;
-
-    private static boolean mSessionEstablished = false;
-    private static int mSessionId;
+    private static final short CONTACT_PORT = 42;     //This is the alljoyn port through which communication takes place 
+    private static SampleInterface myInterface;       
+    private static boolean mSessionEstablished = false; //this is notifying whether a client has joined or not
+    private static int mSessionId;                      //this stores the connection's session id  
     private static String mJoinerName;
-    private static FileInputStream in;
-    private static long previous_time;
-    private static Timer t1;
-    private static long time_left = 10000;
-    private static Boolean first_try = true;
-    private static TimerTask music_player;
-    private static long delay = 0;
-    private static int delay_count = 0;
-    private static long curr_file_dur;
-    private static Thread music_player_handler = null;
-    private static Boolean music_player_running = true;
-    private static data_transfer_thread data_transfer_handler = null;
-    private static Boolean data_transfer = true;
-    private static ArrayList<String> filelist;
-    private static musicPlayerThread mp3player = null;
-    private static long[] music_duration;
+    private static FileInputStream in;                  //this stores the FileInputStream object of the current song
+    private static long previous_time;                  //This used for syncing purpose
+    private static Timer t1;                            //This timer is used to schedule the player
+    private static TimerTask music_player;              //This is the task that handles the music player
+    private static long delay = 0;                      //this stores the Round trip time of a communication with other devices
+    private static int delay_count = 0;                 
+    private static long curr_file_dur;                  //This stores the current music file duration/track length
+    private static Thread music_player_handler = null;  //this handles the continuous music playing
+    private static Boolean music_player_running = true; //this is used to specify whether the music is to be played or not
+    private static data_transfer_thread data_transfer_handler = null;   //this handles the data transfer from service to various clients 
+    private static Boolean data_transfer = true;                        //this specifies whether data_transfer should occur or not
+    private static ArrayList<String> filelist;                          //this stores all the names of the music files to be played
+    private static musicPlayerThread mp3player = null;                  //this stores the object of the music player
+    private static long[] music_duration;                               //this stores the duration of all music files
 
     // data is sent through the interface
     public static class SignalInterface implements SampleInterface, BusObject {
@@ -81,30 +82,33 @@ public class Service {
             // No implementation required for sending data
         }
 
+        //This method is used to estimate the delay between client and service
         @Override
         public void delay_est(long time_stamp, long previous_time) throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
+        //This method is used to notify the client that the data to be received next is of a different song
         @Override
         public void song_change(long duration) throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
-
+        
+        //This method is used to initializes the variables on the client side
         @Override
         public void re_sync() throws BusException {
             throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
 
     }
-
+//This is used to handle the signals on the alljoyn bus 
     public static class SampleSignalHandler {
-
+        //This is used for clock syncing purpose
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
         public void clock_sync(long count_down) throws BusException, FileNotFoundException {
 
         }
-
+        //This is used for estimating the delay of the network
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
         public void delay_est(long time_stamp, long time_stamp_pre) throws IOException, BusException, InterruptedException {
             delay_count++;
@@ -127,7 +131,7 @@ public class Service {
             }
         }
     }
-
+    //This creates a new thread on which music player handler is to be run 
     public static void asyncMusicPlay(final long delay) {
         Runnable task = new Runnable() {
             @Override
@@ -143,6 +147,7 @@ public class Service {
         music_player_handler.start();
     }
 
+    //this method handles the continuous playing of music 
     public static void play_music(long delay) throws InterruptedException, IOException {
 
         mp3player = new musicPlayerThread(in);
@@ -158,7 +163,7 @@ public class Service {
             t1.schedule(mp3player, 500);
 
             Thread.sleep(curr_file_dur);
-            Thread.sleep(500); //for providing gap bwetween music
+            
             in.close();
             if (!music_player_running) {
                 break;
@@ -166,6 +171,7 @@ public class Service {
         }
     }
 
+    //This method is called after the user has selected the music he/she wants to play and is ready to start playing the songs
     public static void play() throws FileNotFoundException, UnsupportedAudioFileException, IOException, BusException, InterruptedException {
         System.out.println("current time" + System.currentTimeMillis());
         music_duration = new long[filelist.size()];
@@ -177,6 +183,7 @@ public class Service {
 
     }
 
+    //This method is used to stop the music player and the data transfer
     public static void stop() throws BusException, IOException {
         if (mp3player != null) {
             mp3player.stop();
@@ -193,6 +200,8 @@ public class Service {
         
     }
     
+    //This method is used to initialize the filelist which stores the names of all the files
+    //that are to be played
     public static void add_song(ArrayList<String> arr) {
         filelist = new ArrayList<String>();
         for (int i = 0; i < arr.size(); i++) {
@@ -200,6 +209,7 @@ public class Service {
         }
     }
 
+    //This initiates the sync process. It initializes all variables 
     public static void sync() throws UnsupportedAudioFileException, IOException, BusException, InterruptedException {
         if (mp3player != null) {
             mp3player.stop();
@@ -216,12 +226,14 @@ public class Service {
         Thread.sleep(100);
         in = new FileInputStream(filelist.get(0));
         previous_time = System.currentTimeMillis();
-       // myInterface.delay_est(System.currentTimeMillis(), 0);
+       
+        // a new data_transfer_handler is initialized
         data_transfer_handler = new data_transfer_thread(filelist, myInterface, music_duration);
         data_transfer_handler.start();
         
     }
 
+    //It sets the duration of the current music file
     public static void set_curr_file_dur(long dur) {
         System.out.println("curr file duration"+dur);
         curr_file_dur = dur;
@@ -238,6 +250,7 @@ public class Service {
         }
     }
 
+    //It runs the service part of the group play feature
     public static void run_service() throws FileNotFoundException, JavaLayerException, IOException, InterruptedException, UnsupportedAudioFileException, BusException{
         BusAttachment mBus;
         mBus = new BusAttachment("AppName", BusAttachment.RemoteMessage.Receive);
@@ -327,6 +340,7 @@ public class Service {
 
             myInterface = emitter.getInterface(SampleInterface.class);
             
+            //It invokes the MusicPlayerGUI which provides the users the ability to select music and play them 
             java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
               new MusicPlayerGUI().setVisible(true);
@@ -334,13 +348,7 @@ public class Service {
             }
         });
             
-            /*
-            Scanner i = new Scanner(System.in);
-            System.out.println("Please press enter to play");
-
-            i.nextLine();
-            */
-            //for data sending purpose
+            
         } catch (InterruptedException ex) {
             System.out.println("Interrupted");
         }
@@ -353,6 +361,7 @@ public class Service {
         run_service();
     }
 
+    //This method is used to calculate the duration of the a music file whose path and name is specified by string s 
     private static long DurationWithMp3Spi(String s) throws UnsupportedAudioFileException, IOException {
         System.out.println("file name "+s);
         File f1 = new File(s);
@@ -373,6 +382,7 @@ public class Service {
     }
 }
 
+//This thread implementation is used to run the music player
 class musicPlayerThread extends TimerTask {
 
     FileInputStream data;
@@ -399,6 +409,7 @@ class musicPlayerThread extends TimerTask {
     }
 }
 
+//This thread implementation is used for handling the data transfer to the clients
 class data_transfer_thread extends Thread {
 
     public ArrayList<String> filelist;
@@ -446,7 +457,7 @@ class data_transfer_thread extends Thread {
                         Thread.sleep(50);
 
                     }
-                    //in2.close();
+                    in2.close();
                     Thread.sleep(curr_file_dur - (sleep_count * 150));
                 }
                 else{
@@ -466,32 +477,3 @@ class data_transfer_thread extends Thread {
 
     }
 }
-/*
- class time_sync_Thread extends Thread {
- SampleInterface myInterface;
- long delay;
- public time_sync_Thread(SampleInterface i,long de_lay) {
- myInterface=i;
- delay=de_lay;
- }
-
- public void run() {
- long time=6*delay;
-  
- for(int i=0;i<5;i++){
- try {
- myInterface.clock_sync(time,delay);
- } catch (BusException ex) {
- Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
- }
- try {
- Thread.sleep(6*delay/10);
- } catch (InterruptedException ex) {
- Logger.getLogger(time_sync_Thread.class.getName()).log(Level.SEVERE, null, ex);
- }
-    
- time=time-(6*delay/10);
- }
- }
- }
- */

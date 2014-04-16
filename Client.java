@@ -1,7 +1,5 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * @ SmartJoyn Feature 3 - Group Play
  */
 package music_stream;
 
@@ -31,43 +29,46 @@ import org.alljoyn.bus.Status;
 import org.alljoyn.bus.annotation.BusSignalHandler;
 import java.util.concurrent.FutureTask;
 
+/**This is the client part of our group play feature.
+ * The client has the power to chose whether it wants to play the song or not.
+ * The client cannot choose songs or control the player on other connected devices
+ */
 public class Client {
 
     static {
         System.loadLibrary("alljoyn_java");
     }
-    private static final short CONTACT_PORT = 42;
+    //Start of variable Declaration
+    private static final short CONTACT_PORT = 42;                       //This is the alljoyn port through which communication takes place 
     static BusAttachment mBus;
-    private static byte[] mu_data = new byte[10000000];
-    private static byte[] mu_data_1 = new byte[10000000];
-    private static Boolean which_buffer = false;
-    private static long curr_file_duration;
-    private static int offset = 0;
-    private static Boolean connected = false;
-    private static Boolean connection_ready = false;
-    private static SignalInterface mySignalInterface = null;
+    private static byte[] mu_data = new byte[10000000];                 //This is one of the two buffers used to store the incoming data
+    private static byte[] mu_data_1 = new byte[10000000];               //This is one of the two buffers used to store the incoming data
+    private static Boolean which_buffer = false;                        //This is used to select to which of the buffer the incoming data is to be written
+    private static long curr_file_duration;                             //This stores the current music file duration
+    private static int offset = 0;                                      //This is the offset from which the next incoming data is to be written on the seleceted buffer
+    private static Boolean connected = false;                           //This is used to specify whether the client is connected to a service or not                    
+    
+    private static SignalInterface mySignalInterface = null;            //This is the interface through which the data is to be pushed
     private static SampleInterface myInterface_1;
-    private static Boolean Start_playing = false;
-    private static int time_sync_count = 0;
-    private static long time_left = 0;
-    private static long previous_time;
+ 
     private static ByteArrayInputStream in;
-    private static Boolean time_sync_completed = false;
-    private static Date date = new Date();
     private static Timer t1;
-    private static TimerTask music_player = null;
+    private static final TimerTask music_player = null;
     private static musicPlayer mp3player = null;
     private static Thread music_player_handler;
 
+    //The following variables are used to calculate the network delay 
     private static long t11, t21, t22, t12, t13, t23;
     private static int step = 0;
     private static double alpha, lat, off;
-
+    ////End of variable declaration
+    
     public static class SampleSignalHandler {
 
+        //This method receives the data pushed onto the alljoyn bus by the master
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "music_data")
         public void music_data(byte[] data) {
-            //System.out.println("data received");
+            
             if (which_buffer) {
                 int j = 0;
                 for (int i = offset; i < offset + data.length; i++, j++) {
@@ -83,6 +84,7 @@ public class Client {
             }
         }
 
+        //When the delay estimated, the service calls this method to start playing the music
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "clock_sync")
         public void clock_sync(long count_down) throws BusException, InterruptedException, IOException {
             double val = count_down - lat;
@@ -91,6 +93,7 @@ public class Client {
 
         }
 
+        //This method is used to calculate the network delay
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "delay_est")
         public void delay_est(long time_stamp, long time_stamp_pre) throws IOException, BusException {
             if (step == 0) {
@@ -115,6 +118,7 @@ public class Client {
 
         }
 
+        //This method is used to notify the client of the incoming next song duration holds the duration of the next song
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "song_change")
         public void song_change(long duration) {
             
@@ -124,6 +128,7 @@ public class Client {
             System.out.println("song change "+curr_file_duration);
         }
         
+        //This method basically initializes the variables of the client
         @BusSignalHandler(iface = "music_stream.SampleInterface", signal = "re_sync")
         public void re_sync(){
         offset=0;
@@ -139,6 +144,7 @@ public class Client {
 
     private static Boolean first = true;
 
+    //This is used to initialize a new thread on which handles continous playing of the music 
     public static void asyncMusicPlay(final long delay){ 
         Runnable task = new Runnable() {
             @Override 
@@ -154,7 +160,7 @@ public class Client {
        music_player_handler.start(); 
     }
     
-    
+    //This method handles the continous playing of music
     public static void play_music(long delay) throws InterruptedException, IOException {
         while (true) {
             System.out.println(which_buffer);
@@ -187,6 +193,7 @@ public class Client {
         }
     }
 
+    //This is the interface through data or communication is transmitted   
     public static class SignalInterface implements SampleInterface, BusObject {
 
         @Override
@@ -216,6 +223,7 @@ public class Client {
 
     }
 
+    //This runs the client part of the Group_play_feature
     public static void run_client() throws InterruptedException{
                 class MyBusListener extends BusListener {
 
@@ -284,7 +292,7 @@ public class Client {
         if (status != Status.OK) {
             return;
         }
-        previous_time = 0;
+        
         System.out.println("BusAttachment.findAdvertisedName successful " + "com.my.well.known.name");
         while (!connected) {
             System.out.println("it's stuck");
@@ -317,6 +325,7 @@ public class Client {
     }
 }
 
+//This thread implementation is used to run the music player
 class musicPlayer extends TimerTask {
 
     ByteArrayInputStream data;
